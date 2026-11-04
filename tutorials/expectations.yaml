@@ -1,11 +1,12 @@
-# For each mutation: which step SHOULD fail (null = nothing should fail).
+# For each mutation: which step SHOULD fail and how it should be diagnosed.
+# null = nothing should fail (tests for false alarms).
 mutations:
-  move_export: export
-  rename_export: export
-  remove_export: export
-  disable_export: export
-  add_confirm: export
-  rename_reports_nav: open_reports
-  wrong_route: open_reports
-  slow_export: null        # slower but still correct -> must NOT be flagged
-  harmless_restyle: null   # looks different but works -> must NOT be flagged
+  move_export:        {step: export,       diagnosis: MOVED}
+  rename_export:      {step: export,       diagnosis: RENAMED}
+  remove_export:      {step: export,       diagnosis: REMOVED}
+  disable_export:     {step: export,       diagnosis: DISABLED}
+  add_confirm:        {step: export,       diagnosis: NEW_STEP_REQUIRED}
+  rename_reports_nav: {step: open_reports, diagnosis: RENAMED}
+  wrong_route:        {step: open_reports, diagnosis: WRONG_DESTINATION}
+  slow_export:        null   # slower but still correct -> must NOT be flagged
+  harmless_restyle:   null   # looks different but works -> must NOT be flagged
