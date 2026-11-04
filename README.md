@@ -67,7 +67,7 @@ Each diagnosis carries a confidence score and evidence (old and new names, overl
 ## Run it
 
 ```powershell
-git clone <this repo>
+git clone https://github.com/Manha27/lockstep.git
 cd lockstep
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
