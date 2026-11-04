@@ -1,0 +1,11 @@
+# For each mutation: which step SHOULD fail (null = nothing should fail).
+mutations:
+  move_export: export
+  rename_export: export
+  remove_export: export
+  disable_export: export
+  add_confirm: export
+  rename_reports_nav: open_reports
+  wrong_route: open_reports
+  slow_export: null        # slower but still correct -> must NOT be flagged
+  harmless_restyle: null   # looks different but works -> must NOT be flagged

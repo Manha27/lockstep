@@ -1,0 +1,25 @@
+name: Export a monthly report
+steps:
+  - id: open_dashboard
+    intent: Open the app
+    action: goto
+    url: /
+    expect:
+      element_visible: {role: heading, name: Dashboard}
+    narration: "Start on the dashboard."
+
+  - id: open_reports
+    intent: Open the Reports page
+    action: click
+    target: {role: link, name: Reports}
+    expect:
+      url_contains: /reports
+    narration: "Click Reports in the top menu."
+
+  - id: export
+    intent: Export the report as CSV
+    action: click
+    target: {role: button, name: Export to CSV}
+    expect:
+      text_visible: Export started
+    narration: "Click Export to CSV to download the report."
