@@ -7,9 +7,18 @@ app = Flask(__name__)
 STATE = {"mutation": None}
 
 MUTATIONS = {
+    # --- M1/M2 set ---
     "move_export", "rename_export", "remove_export", "disable_export",
     "add_confirm", "rename_reports_nav", "wrong_route",
     "slow_export", "harmless_restyle",
+    # --- M3: harder / subtler cases ---
+    "same_label_new_page",   # label unchanged, but the button now goes elsewhere
+    "renamed_and_moved",     # renamed AND hidden inside a menu at the same time
+    "blocked_overlay",       # cookie popup covers the page
+    "changed_banner_text",   # works, but the success message changed
+    "duplicate_export",      # two identical "Export to CSV" buttons
+    "late_button",           # button appears after 1.2s (still within tolerance)
+    "reorder_nav",           # nav order changed (harmless)
 }
 
 PAGE = """<!doctype html>
@@ -24,31 +33,28 @@ PAGE = """<!doctype html>
   .banner { background: #e6f7ea; border: 1px solid #9bd5a8; padding: 10px; margin: 16px 0; }
   .modal { border: 2px solid #333; background: #fff; padding: 20px; margin: 16px 0; }
   .fancy { background: #6c4bd6; color: #fff; border: 0; border-radius: 8px; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50;
+             display: flex; align-items: center; justify-content: center; }
 </style></head><body>
-<nav>
-  <a href="/">Dashboard</a>
-  <a href="{{ reports_href }}">{{ reports_label }}</a>
-  <a href="/settings">Settings</a>
-</nav>
+<nav>{{ nav|safe }}</nav>
 <main>{{ body|safe }}</main>
 </body></html>"""
 
 
 def render(body):
     m = STATE["mutation"]
-    return render_template_string(
-        PAGE,
-        body=body,
-        reports_label="Analytics" if m == "rename_reports_nav" else "Reports",
-        reports_href="/coming-soon" if m == "wrong_route" else "/reports",
-    )
+    label = "Analytics" if m == "rename_reports_nav" else "Reports"
+    href = "/coming-soon" if m == "wrong_route" else "/reports"
+    links = [("/", "Dashboard"), (href, label), ("/settings", "Settings")]
+    if m == "reorder_nav":
+        links = [links[2], links[1], links[0]]
+    nav = "".join(f'<a href="{h}">{t}</a>' for h, t in links)
+    return render_template_string(PAGE, body=body, nav=nav)
 
 
-def form(label, extra=""):
-    return (
-        '<form method="post" action="/reports/export">'
-        f'<button type="submit" {extra}>{label}</button></form>'
-    )
+def form(label, extra="", action="/reports/export", method="post"):
+    return (f'<form method="{method}" action="{action}">'
+            f'<button type="submit" {extra}>{label}</button></form>')
 
 
 def export_widget():
@@ -61,8 +67,21 @@ def export_widget():
         return form("Export to CSV", "disabled")
     if m == "move_export":
         return "<details><summary>More actions</summary>" + form("Export to CSV") + "</details>"
+    if m == "renamed_and_moved":
+        return "<details><summary>More actions</summary>" + form("Download CSV") + "</details>"
     if m == "harmless_restyle":
         return form("Export to CSV", 'class="fancy"')
+    if m == "same_label_new_page":
+        return form("Export to CSV", action="/coming-soon", method="get")
+    if m == "duplicate_export":
+        return form("Export to CSV") + form("Export to CSV")
+    if m == "late_button":
+        return ('<div id="slot"></div><script>setTimeout(function(){document.getElementById("slot").innerHTML='
+                + repr(form("Export to CSV")) + ';}, 1200);</script>')
+    if m == "blocked_overlay":
+        return (form("Export to CSV")
+                + '<div class="overlay"><div class="modal"><p>We use cookies.</p>'
+                  '<button type="button">Accept cookies</button></div></div>')
     if m == "add_confirm":
         return (
             '<button type="button" onclick="document.getElementById(\'m\').hidden=false">'
@@ -86,11 +105,13 @@ def reports():
 
 @app.post("/reports/export")
 def do_export():
-    if STATE["mutation"] == "slow_export":
+    m = STATE["mutation"]
+    if m == "slow_export":
         time.sleep(1.0)
+    word = "Export complete" if m == "changed_banner_text" else "Export started"
     return render(
         "<h1>Reports</h1><p>Monthly sales report.</p>"
-        '<div class="banner">Export started: report.csv</div>' + export_widget()
+        f'<div class="banner">{word}: report.csv</div>' + export_widget()
     )
 
 

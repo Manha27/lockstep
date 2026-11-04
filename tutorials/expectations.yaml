@@ -1,12 +1,22 @@
-# For each mutation: which step SHOULD fail and how it should be diagnosed.
-# null = nothing should fail (tests for false alarms).
+# For each mutation: which step SHOULD fail and how it SHOULD be diagnosed.
+# null = nothing should fail (these test for false alarms on harmless changes).
 mutations:
-  move_export:        {step: export,       diagnosis: MOVED}
-  rename_export:      {step: export,       diagnosis: RENAMED}
-  remove_export:      {step: export,       diagnosis: REMOVED}
-  disable_export:     {step: export,       diagnosis: DISABLED}
-  add_confirm:        {step: export,       diagnosis: NEW_STEP_REQUIRED}
-  rename_reports_nav: {step: open_reports, diagnosis: RENAMED}
-  wrong_route:        {step: open_reports, diagnosis: WRONG_DESTINATION}
-  slow_export:        null   # slower but still correct -> must NOT be flagged
-  harmless_restyle:   null   # looks different but works -> must NOT be flagged
+  # --- basic cases ---
+  move_export:         {step: export,       diagnosis: MOVED}
+  rename_export:       {step: export,       diagnosis: RENAMED}
+  remove_export:       {step: export,       diagnosis: REMOVED}
+  disable_export:      {step: export,       diagnosis: DISABLED}
+  add_confirm:         {step: export,       diagnosis: NEW_STEP_REQUIRED}
+  rename_reports_nav:  {step: open_reports, diagnosis: RENAMED}
+  wrong_route:         {step: open_reports, diagnosis: WRONG_DESTINATION}
+  # --- subtle cases ---
+  same_label_new_page: {step: export,       diagnosis: OUTCOME_CHANGED}
+  renamed_and_moved:   {step: export,       diagnosis: MOVED}   # truth: renamed + moved
+  blocked_overlay:     {step: export,       diagnosis: BLOCKED}
+  changed_banner_text: {step: export,       diagnosis: OUTCOME_CHANGED}
+  duplicate_export:    {step: export,       diagnosis: AMBIGUOUS_TARGET}
+  # --- harmless changes: must NOT be flagged ---
+  slow_export:         null
+  harmless_restyle:    null
+  late_button:         null
+  reorder_nav:         null

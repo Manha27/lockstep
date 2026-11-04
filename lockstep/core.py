@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 
 import yaml
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout, Error as PWError
 
 STEP_TIMEOUT_MS = 2000
 VIEWPORT = {"width": 1280, "height": 800}
@@ -122,6 +122,10 @@ def do_step(page, step, base_url):
             loc.wait_for(state="visible", timeout=STEP_TIMEOUT_MS)
         except PWTimeout:
             raise StepFailure("target_not_found_or_hidden")
+        except PWError as e:
+            if "strict mode violation" in str(e):
+                raise StepFailure("target_ambiguous")
+            raise
         try:
             if action == "click":
                 loc.click(timeout=STEP_TIMEOUT_MS)
@@ -146,11 +150,22 @@ def diagnose(page, step, reason, base_entry):
     target = step.get("target")
     bbox = base_entry.get("bbox")
 
-    # 1) The element is there but can't be used.
+    # 0) More than one element matches, so the tutorial is no longer precise.
+    if reason == "target_ambiguous":
+        return {"label": "AMBIGUOUS_TARGET", "confidence": 0.9,
+                "evidence": {"matches": exists_anywhere(page, target)}}
+
+    # 1) The element is there but can't be used: disabled, or covered by something new.
     if reason == "target_not_clickable":
-        disabled = locate(page, target).first.is_disabled()
-        return {"label": "DISABLED", "confidence": 0.9 if disabled else 0.5,
-                "evidence": {"is_disabled": disabled}}
+        if locate(page, target).first.is_disabled():
+            return {"label": "DISABLED", "confidence": 0.9,
+                    "evidence": {"is_disabled": True}}
+        now = controls(page.locator("body").aria_snapshot())
+        new_controls = sorted(n for _, n in now - controls(base_entry.get("aria")))
+        if new_controls:
+            return {"label": "BLOCKED", "confidence": 0.75,
+                    "evidence": {"new_controls_on_top": new_controls}}
+        return {"label": "NOT_CLICKABLE", "confidence": 0.4, "evidence": {}}
 
     # 2) The element could not be seen at its place.
     if reason == "target_not_found_or_hidden":
