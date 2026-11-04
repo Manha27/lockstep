@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 from .core import (capture_baseline, first_failure, load_tutorial, run_tutorial)
 from .report import summarize, to_markdown
+from .screen import build_screen
 
 
 def cmd_baseline(a):
@@ -85,6 +86,14 @@ def cmd_eval(a):
     print("\nSaved out/results.json and out/results.md")
 
 
+def cmd_screen(a):
+    out = build_screen(a.tutorial)
+    print(f"Saved {out}")
+    if a.open:
+        import webbrowser
+        webbrowser.open(Path(out).resolve().as_uri())
+
+
 def main():
     p = argparse.ArgumentParser(prog="lockstep")
     p.add_argument("--url", default="http://localhost:5000")
@@ -100,6 +109,9 @@ def main():
         c = sub.add_parser(name); c.add_argument("tutorial")
         c.add_argument("--expectations", default="tutorials/expectations.yaml")
         c.add_argument("--repeat", type=int, default=10); c.set_defaults(fn=cmd_eval)
+
+    sc = sub.add_parser("screen"); sc.add_argument("tutorial")
+    sc.add_argument("--open", action="store_true"); sc.set_defaults(fn=cmd_screen)
 
     a = p.parse_args()
     a.fn(a)

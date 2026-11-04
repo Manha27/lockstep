@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video health</title>
+<style>
+:root{--canvas:#E9EDF2;--panel:#fff;--ink:#14213D;--muted:#566178;--line:#D3DAE5;--sel:#3452E1;
+--fresh:#17795E;--review:#9A5F08;--broken:#C42D47;--fresh-bg:#DDF2EA;--review-bg:#F8EBCF;--broken-bg:#F9DDE2}
+@media (prefers-color-scheme:dark){:root{--canvas:#0E1424;--panel:#161E33;--ink:#E8ECF5;--muted:#9AA6BF;
+--line:#2A3552;--sel:#8CA0FF;--fresh:#4CC9A0;--review:#E3A93F;--broken:#FF7189;
+--fresh-bg:#12332B;--review-bg:#3A2D10;--broken-bg:#3D1823}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
+.app{display:grid;grid-template-columns:330px 1fr;min-height:100vh}
+.rail{background:var(--panel);border-right:1px solid var(--line);padding:28px 0}
+.rail h1{font-size:21px;letter-spacing:-.015em;margin:0 24px 2px}
+.rail .sub{margin:0 24px 18px;color:var(--muted);font-size:13px}
+.counts{display:flex;gap:22px;margin:0 24px 18px;font-size:13px;color:var(--muted)}
+.counts b{display:block;font-size:26px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.counts .f b{color:var(--fresh)}.counts .r b{color:var(--review)}.counts .b b{color:var(--broken)}
+.row{display:flex;width:100%;gap:12px;align-items:center;padding:10px 24px;border:0;background:none;
+text-align:left;cursor:pointer;border-left:3px solid transparent}
+.row:hover{background:var(--canvas)}
+.row[aria-current=true]{background:var(--canvas);border-left-color:var(--sel)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.row small{display:block;color:var(--muted);font-size:12.5px}
+.s-fresh{background:var(--fresh)}.s-review{background:var(--review)}.s-broken{background:var(--broken)}
+main{padding:32px 44px 56px;max-width:1120px}
+.head{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
+.head h2{margin:0;font-size:28px;letter-spacing:-.02em;line-height:1.2}
+.badge{font-size:13px;font-weight:600;padding:3px 10px;border-radius:99px}
+.b-fresh{background:var(--fresh-bg);color:var(--fresh)}.b-review{background:var(--review-bg);color:var(--review)}
+.b-broken{background:var(--broken-bg);color:var(--broken)}
+.lede{margin:6px 0 0;color:var(--muted);max-width:68ch}
+.strip{display:flex;gap:4px;margin:26px 0 30px}
+.seg{flex:1;min-width:0;padding:12px 14px;background:var(--panel);border-top:4px solid var(--line);font-size:13px;color:var(--muted)}
+.seg b{display:block;color:var(--ink);font-size:14px}
+.seg.ok{border-top-color:var(--fresh)}.seg.skip{opacity:.55}
+.seg.bad{border-top-color:var(--broken);background:var(--broken-bg)}
+.seg.bad em{display:block;font-style:normal;font-weight:600;color:var(--broken);margin-top:4px}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+figure{margin:0}
+.frame{position:relative;aspect-ratio:16/10;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
+.frame img{display:block;width:150%;height:150%;max-width:none;object-fit:cover}
+.frame .box{position:absolute;border:3px solid var(--fresh);box-sizing:border-box}
+figcaption{margin-top:8px;font-size:13px;color:var(--muted)}
+figcaption b{color:var(--ink)}
+.detail{display:grid;grid-template-columns:1.25fr 1fr;gap:44px;margin-top:34px}
+.detail h3{margin:0 0 8px;font-size:17px;letter-spacing:-.01em}
+.what p{margin:0 0 14px;max-width:62ch}
+.say{border-left:3px solid var(--line);padding:2px 0 2px 14px;color:var(--muted);margin:0 0 16px}
+.say b{color:var(--ink);font-weight:600}
+.meter{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
+.bar{width:140px;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--sel)}
+.issue{border-top:1px solid var(--line);padding:14px 0}
+.issue:last-child{border-bottom:1px solid var(--line)}
+.issue p{margin:0 0 10px}
+.fix{border:0;background:var(--ink);color:var(--canvas);padding:8px 14px;border-radius:6px;font-weight:600;cursor:pointer}
+.fix:hover{opacity:.9}
+.empty{padding:36px 0;font-size:20px;letter-spacing:-.01em}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--canvas);
+padding:10px 16px;border-radius:8px;font-size:14px;max-width:90vw}
+.toast[hidden]{display:none}
+@media (max-width:900px){.app{grid-template-columns:1fr}.rail{border-right:0;border-bottom:1px solid var(--line)}
+main{padding:24px 20px}.compare,.detail{grid-template-columns:1fr;gap:24px}.strip{flex-direction:column}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div class="app">
+  <nav class="rail" aria-label="Checked versions">
+    <h1>Video health</h1>
+    <p class="sub" id="sub"></p>
+    <div class="counts" id="counts"></div>
+    <div id="list"></div>
+  </nav>
+  <main id="main" tabindex="-1"></main>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script>
+const DATA = /*__DATA__*/null;
+const TITLES = {move_export:"Export button moved into a menu",rename_export:"Export button renamed",
+remove_export:"Export button removed",disable_export:"Export button disabled",
+add_confirm:"Export now asks for confirmation",rename_reports_nav:"Reports link renamed",
+wrong_route:"Reports link opens a different page",same_label_new_page:"Export button sends people elsewhere",
+renamed_and_moved:"Export button renamed and moved",blocked_overlay:"A popup covers the Export button",
+changed_banner_text:"Export message changed",duplicate_export:"Two Export buttons share one name",
+slow_export:"Export is slower",harmless_restyle:"Export button restyled",late_button:"Export button loads later",
+reorder_nav:"Menu order changed"};
+const FIX = {MOVED:"Re-record this step",RENAMED:"Update the script and re-record",REMOVED:"Re-record without this step",
+DISABLED:"Re-record after enabling the button",BLOCKED:"Re-record with the popup dismissed",
+NEW_STEP_REQUIRED:"Add the new step and re-record",WRONG_DESTINATION:"Re-record this step",
+AMBIGUOUS_TARGET:"Pick the right button and re-record",OUTCOME_CHANGED:"Review, then re-record this step",
+NOT_CLICKABLE:"Review this step"};
+const STATUS = {fresh:"Fresh",review:"Needs review",broken:"Broken"};
+const title = c => TITLES[c.mutation] || c.mutation.replace(/_/g," ");
+const status = c => !c.got ? "fresh" : (c.got.confidence >= 0.75 ? "broken" : "review");
+const pct = c => Math.round(c.got.confidence*100);
+const $ = id => document.getElementById(id);
+function h(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs||{})){
+    if (k==="class") e.className=v; else if (k.startsWith("on")) e.addEventListener(k.slice(2),v);
+    else if (v!==null && v!==undefined) e.setAttribute(k,v);
+  }
+  for (const k of kids.flat()) if (k!==null && k!==undefined && k!==false) e.append(k.nodeType?k:document.createTextNode(k));
+  return e;
+}
+const q = s => "\u201C"+s+"\u201D";
+function sentence(c){
+  const g = c.got, ev = g.evidence||{}, step = DATA.steps.find(s=>s.id===g.step);
+  const name = step && step.target_name ? q(step.target_name) : "the control";
+  switch(g.diagnosis){
+    case "MOVED": return name+" still exists, but it is now hidden inside a menu or panel.";
+    case "RENAMED": return q(ev.old_name)+" is now called "+q(ev.new_name)+".";
+    case "REMOVED": return "Nothing like "+name+" exists where it used to be.";
+    case "DISABLED": return name+" is on the page but switched off, so a click does nothing.";
+    case "BLOCKED": return "Something new covers the page: "+(ev.new_controls_on_top||[]).map(q).join(", ")+".";
+    case "NEW_STEP_REQUIRED": return "A new step appeared: "+(ev.new_controls||[]).map(q).join(", ")+".";
+    case "WRONG_DESTINATION": return "The click now lands on "+ev.actual_url.replace(/^https?:\/\/[^/]+/,"")+", not a page containing "+q(ev.expected_url_part)+".";
+    case "AMBIGUOUS_TARGET": return (ev.matches||2)+" controls share the name "+name+", so the video can\u2019t say which one to click.";
+    case "OUTCOME_CHANGED": return "The click went through, but the result no longer matches what the video promises.";
+    default: return "The step no longer behaves as recorded.";
+  }
+}
+function narrationLine(c){
+  const step = DATA.steps.find(s=>s.id===c.got.step);
+  if (!step || !step.narration) return null;
+  const ev = c.got.evidence||{};
+  const now = c.got.diagnosis==="RENAMED" ? " The screen now says "+q(ev.new_name)+"." : "";
+  return h("p",{class:"say"},"The voiceover says ",h("b",null,q(step.narration)),now);
+}
+function renderList(){
+  const order = {broken:0,review:1,fresh:2};
+  const cases = [...DATA.cases].sort((a,b)=>order[status(a)]-order[status(b)]);
+  const n = {fresh:0,review:0,broken:0}; cases.forEach(c=>n[status(c)]++);
+  $("sub").textContent = DATA.tutorial+", checked against the live app";
+  $("counts").replaceChildren(
+    h("div",{class:"f"},h("b",null,n.fresh),"Fresh"),
+    h("div",{class:"r"},h("b",null,n.review),"Needs review"),
+    h("div",{class:"b"},h("b",null,n.broken),"Broken"));
+  $("list").replaceChildren(...cases.map(c=>h("button",{class:"row","data-m":c.mutation,onclick:()=>select(c.mutation)},
+    h("span",{class:"dot s-"+status(c)}),
+    h("span",null,title(c),h("small",null,STATUS[status(c)])))));
+  return cases;
+}
+function select(m){
+  const c = DATA.cases.find(x=>x.mutation===m), st = status(c);
+  document.querySelectorAll(".row").forEach(r=>r.setAttribute("aria-current", r.dataset.m===m));
+  const failIdx = c.got ? DATA.steps.findIndex(s=>s.id===c.got.step) : -1;
+  const strip = h("div",{class:"strip",role:"list"},DATA.steps.map((s,i)=>{
+    const cls = !c.got ? "ok" : i<failIdx ? "ok" : i===failIdx ? "bad" : "skip";
+    return h("div",{class:"seg "+cls,role:"listitem"},h("b",null,s.intent),
+      cls==="ok"?"Matches the app":cls==="skip"?"Not checked":"Does not match the app",
+      cls==="bad"?h("em",null,"The video breaks here"):null);
+  }));
+  const head = h("div",null,h("div",{class:"head"},h("h2",null,title(c)),h("span",{class:"badge b-"+st},STATUS[st])),
+    h("p",{class:"lede"}, !c.got ? "Every step still works in the live app. No action needed."
+      : st==="broken" ? "This video no longer matches the app. Fix it before people watch it."
+      : "A change was detected, but the check is not sure what it means. A person should look."));
+  let body;
+  if (!c.got){ body = h("p",{class:"empty"},"This video still matches the app."); }
+  else {
+    const b = c.baseline_bbox, base = DATA.images[c.baseline_screenshot], now = DATA.images[c.failure_screenshot];
+    const box = b ? h("div",{class:"box",style:`left:${b.x/8.533}%;top:${b.y/5.333}%;width:${b.width/8.533}%;height:${b.height/5.333}%`}) : null;
+    body = h("div",null,
+      h("div",{class:"compare"},
+        h("figure",null,h("div",{class:"frame"},base?h("img",{src:base,alt:"The step as recorded"}):null,box),
+          h("figcaption",null,h("b",null,"In the video"),". The outline marks the control.")),
+        h("figure",null,h("div",{class:"frame"},now?h("img",{src:now,alt:"The step in the live app today"}):null),
+          h("figcaption",null,h("b",null,"In the app today"),". The red outline marks where the control used to be."))),
+      h("div",{class:"detail"},
+        h("section",{class:"what"},h("h3",null,"What changed"),h("p",null,sentence(c)),narrationLine(c),
+          h("div",{class:"meter"},h("div",{class:"bar",role:"img","aria-label":"Confidence "+pct(c)+" percent"},h("i",{style:`width:${pct(c)}%`})),
+            "Confidence "+pct(c)+"%. A person should check anything under 75%.")),
+        h("section",null,h("h3",null,"Draft issues"),
+          h("div",{class:"issue"},h("p",null,"Step "+(failIdx+1)+": "+DATA.steps[failIdx].intent+" no longer matches."),
+            h("button",{class:"fix",onclick:()=>toast("Prototype only. This would re-record step "+(failIdx+1)+" in Clueso.")},
+              FIX[c.got.diagnosis]||"Review this step")))));
+  }
+  $("main").replaceChildren(head,strip,body);
+  if (window.innerWidth<=900 && window.__picked) $("main").scrollIntoView();
+  window.__picked = true;
+}
+let t; function toast(msg){const e=$("toast");e.textContent=msg;e.hidden=false;clearTimeout(t);t=setTimeout(()=>e.hidden=true,3200);}
+const sorted = renderList();
+select((sorted.find(c=>c.got)||sorted[0]).mutation);
+</script></body></html>
